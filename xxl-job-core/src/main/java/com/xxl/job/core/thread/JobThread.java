@@ -29,6 +29,10 @@ public class JobThread extends Thread{
 
 	private int jobId;
 	private IJobHandler handler;
+	/**
+	 * LinkedBlockingQueue的take是一个阻塞队列 ，如果没有任务则会一直阻塞在这里。
+	 * poll ： 是一个非阻塞队列，如果为空则直接返回null
+	 */
 	private LinkedBlockingQueue<TriggerParam> triggerQueue;
 	private Set<Long> triggerLogIdSet;		// avoid repeat trigger for the same TRIGGER_LOG_ID
 
@@ -110,7 +114,18 @@ public class JobThread extends Thread{
 
             TriggerParam triggerParam = null;
             try {
-				// to check toStop signal, we need cycle, so wo cannot use queue.take(), instand of poll(timeout)
+				/**
+				 在这段代码中，xxljob 选择使用 poll 方法而不是 take 方法，
+				 是因为 take 方法是一个阻塞方法，如果队列为空，则会一直阻塞等待，直到有元素可以被获取。而在这种情况下，xxljob 需要定期检查 toStop 信号是否到达，因此不能一直阻塞等待。
+				 <p>
+				 相反，poll 方法是一个非阻塞方法，它可以通过设置超时时间来实现等待。在这段代码中，xxljob 设置了一个 3 秒的超时时间，
+				 如果在这个时间内没有获取到元素，则 poll 方法会返回 null。这样，xxljob 可以定期检查 toStop 信号，同时又不会一直阻塞等待。
+				 <p>
+				 需要注意的是，即使使用 poll 方法，xxljob 也需要在循环中反复调用该方法，以便定期检查 toStop 信号。
+				 如果只调用一次 poll 方法，那么在队列为空时，该方法将立即返回 null，xxljob 将无法检查 toStop 信号。
+
+
+				 */
 				triggerParam = triggerQueue.poll(3L, TimeUnit.SECONDS);
 				if (triggerParam!=null) {
 					running = true;
